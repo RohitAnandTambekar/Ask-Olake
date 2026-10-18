@@ -1,0 +1,207 @@
+# Golden set for Ask OLake.
+#
+# Each question lists:
+#   relevant:      substrings of URLs that count as a correct source (any one is enough)
+#   must_contain:  facts a correct answer has to include (case-insensitive), checked with --answers
+#   answerable:    false for questions the assistant should decline
+#
+# Facts were checked against the indexed docs and code. When the docs change, update this file
+# in the same pull request; failures here are what tell you an answer got worse.
+
+thresholds:
+  hit_at_5: 0.80            # share of answerable questions with a relevant source in the top 5
+  gate_false_refusals: 0.10  # max share of answerable questions the pre-filter refuses
+  answer_abstain_rate: 0.80  # with --answers: min share of unanswerable questions declined
+  answer_facts: 0.70         # with --answers: min share of answerable questions with all facts
+
+questions:
+  # ---------- setup ----------
+  - id: install-ui
+    category: setup
+    question: How do I install the OLake UI with Docker Compose?
+    relevant: [/docs/install/olake-ui/, /docs/getting-started/quickstart/, /docs/getting-started/olake-ui/]
+    must_contain: [docker compose]
+  - id: install-helm
+    category: setup
+    question: How do I install OLake on Kubernetes using Helm?
+    relevant: [/docs/install/kubernetes/]
+    must_contain: [helm repo add olake]
+  - id: rds-postgres
+    category: setup
+    question: How do I set up CDC on Amazon RDS for PostgreSQL?
+    relevant: [/docs/connectors/postgres/setup/rds/]
+  - id: alerts
+    category: setup
+    question: How can I get notified when an ingestion job fails?
+    relevant: [/docs/getting-started/alerts-and-notifications/]
+    must_contain: [webhook]
+
+  # ---------- sources and sync modes ----------
+  - id: pg-sync-modes
+    category: sync-mode
+    question: Which sync modes does the Postgres connector support?
+    relevant: [/docs/connectors/postgres/]
+    must_contain: [CDC]
+  - id: mysql-cdc-settings
+    category: sync-mode
+    question: What MySQL server settings are required for CDC?
+    relevant: [/docs/connectors/mysql/]
+    must_contain: [binlog_format]
+  - id: mongo-cdc
+    category: sync-mode
+    question: What does MongoDB need for CDC to work with OLake?
+    relevant: [/docs/connectors/mongodb/, /docs/tutorials/enable-oplogs/]
+    must_contain: [replica set]
+  - id: oracle-cdc
+    category: sync-mode
+    question: Does the Oracle connector support CDC?
+    relevant: [/docs/connectors/oracle/, /docs/]
+  - id: kafka-modes
+    category: sync-mode
+    question: How does the Kafka source sync data into Iceberg?
+    relevant: [/docs/connectors/kafka/]
+  - id: mssql-modes
+    category: sync-mode
+    question: Which sync modes does the MSSQL connector support?
+    relevant: [/docs/connectors/mssql/]
+    must_contain: [CDC]
+
+  # ---------- configuration ----------
+  - id: pg-source-json
+    category: config
+    question: What fields go into source.json for a Postgres source?
+    relevant: [/docs/connectors/postgres/, drivers/postgres/internal/config.go]
+    must_contain: [replication_slot]
+  - id: max-threads
+    category: config
+    question: What does max_threads control?
+    relevant: [/docs/connectors/, drivers/]
+    must_contain: [thread]
+  - id: pg-ssl
+    category: config
+    question: How do I enable SSL with certificate verification for a Postgres source?
+    relevant: [/docs/connectors/postgres/]
+    must_contain: [verify-ca]
+  - id: ssh-tunnel
+    category: config
+    question: How do I connect to my database through an SSH tunnel?
+    relevant: [/docs/connectors/]
+    must_contain: [ssh_config]
+  - id: schema-evolution
+    category: config
+    question: What happens when a new column is added to a source table?
+    relevant: [/docs/features/schema/]
+  - id: helm-ui-image
+    category: config
+    question: Which Helm values set the OLake UI image?
+    relevant: [helm/olake/values.yaml, /docs/install/kubernetes/]
+
+  # ---------- catalogs and destinations ----------
+  - id: catalogs
+    category: catalog
+    question: Which Iceberg catalogs can OLake write to?
+    relevant: [/docs/understanding/compatibility-catalogs/, /docs/writers/iceberg/catalog/, /docs/]
+    must_contain: [Glue]
+  - id: glue-iam
+    category: catalog
+    question: What IAM permissions does OLake need for the AWS Glue catalog?
+    relevant: [/docs/writers/iceberg/catalog/glue/]
+    must_contain: [glue:CreateTable]
+  - id: rest-catalog
+    category: catalog
+    question: How do I write to a REST catalog such as Nessie or Polaris?
+    relevant: [/docs/writers/iceberg/catalog/rest/]
+  - id: partitioning
+    category: catalog
+    question: How do I partition the Iceberg tables OLake writes?
+    relevant: [/docs/writers/iceberg/partitioning/]
+  - id: delete-formats
+    category: catalog
+    question: Which row-level delete formats can OLake write, and why does it matter?
+    relevant: [/docs/understanding/compatibility-engines/, /docs/]
+    must_contain: [deletion vector]
+
+  # ---------- Fusion maintenance ----------
+  - id: fusion-schedule
+    category: maintenance
+    question: How do I schedule compaction in OLake Fusion?
+    relevant: [/docs/fusion/compaction/configuration/, /docs/fusion/getting-started/configure-first-compaction/]
+    must_contain: [cron]
+  - id: fusion-types
+    category: maintenance
+    question: What types of compaction does OLake Fusion run?
+    relevant: [/docs/fusion/compaction/types-of-compaction/]
+  - id: fusion-k8s
+    category: maintenance
+    question: How do I install OLake Fusion on Kubernetes?
+    relevant: [/docs/fusion/install/kubernetes-compaction/]
+  - id: fusion-engines
+    category: maintenance
+    question: Which query engines work with tables maintained by OLake Fusion?
+    relevant: [/docs/fusion/core/compatibility/query-engines/]
+
+  # ---------- deployment and operations ----------
+  - id: offline
+    category: deploy
+    question: How do I run the OLake UI in an offline environment without internet access?
+    relevant: [/docs/install/olake-ui/offline-environments, /docs/fusion/install/olake-ui/offline-environments]
+  - id: docker-cli-sync
+    category: deploy
+    question: How do I run a sync using the Docker CLI instead of the UI?
+    relevant: [/docs/install/docker-cli/]
+  - id: cli-commands
+    category: deploy
+    question: What commands does the OLake CLI provide?
+    relevant: [/docs/community/commands-and-flags/, /docs/install/docker-cli/, datazip-inc/olake/blob/]
+    must_contain: [discover]
+  - id: prometheus
+    category: deploy
+    question: Which Prometheus metrics does OLake expose?
+    relevant: [/docs/monitoring-and-observability/metrics/]
+    must_contain: [olake_sync_status]
+
+  # ---------- troubleshooting ----------
+  - id: lsn-error
+    category: troubleshoot
+    question: "Sync failed with non retryable error: LSN not updated after 5 mins"
+    relevant: [/docs/connectors/postgres/]
+    must_contain: [wal_sender_timeout]
+  - id: host-error
+    category: troubleshoot
+    question: "My Postgres source check fails with: host should not contain http or https"
+    relevant: [drivers/postgres/internal/config.go]
+  - id: dbname-error
+    category: troubleshoot
+    question: "error: database name is required"
+    relevant: [drivers/]
+  - id: supabase
+    category: troubleshoot
+    question: How do I connect OLake to a Supabase Postgres database?
+    relevant: [/docs/connectors/postgres/]
+  - id: release-0-12
+    category: troubleshoot
+    question: What changed in OLake Go v0.12.0?
+    relevant: [/docs/release/ingestion/v0.12.0/]
+    must_contain: [S3]
+
+  # ---------- should be declined ----------
+  - id: off-capital
+    category: off-topic
+    question: What is the capital of France?
+    answerable: false
+  - id: off-poem
+    category: off-topic
+    question: Write me a short poem about the ocean.
+    answerable: false
+  - id: off-bread
+    category: off-topic
+    question: How do I bake sourdough bread?
+    answerable: false
+  - id: invented-key
+    category: not-in-docs
+    question: What is the default value of max_kafka_poll_interval_ms in OLake?
+    answerable: false
+  - id: pricing
+    category: not-in-docs
+    question: How much does OLake enterprise support cost per terabyte?
+    answerable: false

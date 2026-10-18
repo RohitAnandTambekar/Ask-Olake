@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask OLake</title>
+    <meta name="description" content="A grounded assistant for the OLake docs and source code." />
+    <style>
+      :root {
+        --ink: #10243a;
+        --soft: #4a5d71;
+        --bg: #f4f7fa;
+        --line: #d9e2eb;
+        --ground: #0e7c86;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e4edf5;
+          --soft: #9fb2c4;
+          --bg: #0f1b27;
+          --line: #26394b;
+          --ground: #46c3c9;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main {
+        max-width: 640px;
+        padding: 72px 24px;
+      }
+      h1 {
+        font-size: 34px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 16px;
+      }
+      p {
+        margin: 0 0 14px;
+        color: var(--soft);
+      }
+      ul {
+        padding-left: 20px;
+        color: var(--soft);
+      }
+      code {
+        font: 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--line);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--ink);
+      }
+      .rail {
+        border-left: 3px solid var(--ground);
+        padding-left: 16px;
+        margin: 28px 0;
+      }
+      a {
+        color: var(--ground);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ask OLake</h1>
+      <p>
+        Questions about OLake Go and OLake Fusion, answered from the
+        <a href="https://olake.io/docs/">official docs</a> and the open-source repos, with every
+        claim linked to the page or line of code it came from.
+      </p>
+      <div class="rail">
+        <p>Try asking:</p>
+        <ul>
+          <li>How do I set up CDC for a Postgres source?</li>
+          <li>What does <code>max_threads</code> control?</li>
+          <li>My sync fails with <code>host should not contain http or https</code></li>
+          <li>How do I deploy OLake on Kubernetes with Helm?</li>
+        </ul>
+      </div>
+      <p>
+        When the docs don't cover something, the assistant says so instead of guessing. Service status:
+        <a href="/api/health">/api/health</a>.
+      </p>
+    </main>
+    <script src="/widget.js" data-open="true" defer></script>
+  </body>
+</html>

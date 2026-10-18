@@ -1,0 +1,41 @@
+[project]
+name = "ask-olake"
+version = "0.1.0"
+description = "Grounded chat assistant for the OLake docs and source code"
+requires-python = ">=3.11"
+dependencies = [
+    "olake-shared",
+    "olake-ingest",
+    "olake-api",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/olake_shared", "apps/ingest", "apps/api"]
+
+[tool.uv.sources]
+olake-shared = { workspace = true }
+olake-ingest = { workspace = true }
+olake-api = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "apps"]
+# Never collect tests from the cloned upstream repos.
+norecursedirs = [".*", "out", "node_modules"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Cloned upstream repos and pipeline output are not our code.
+extend-exclude = ["apps/ingest/.work", "apps/ingest/out"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["olake_shared", "olake_ingest", "olake_api"]

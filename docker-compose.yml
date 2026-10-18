@@ -1,0 +1,54 @@
+# Local development:   docker compose up -d                 (just Postgres + pgvector)
+# Run everything:      docker compose --profile app up -d   (Postgres + the API on :8000)
+# Build the index:     docker compose run --rm ingest olake-ingest migrate
+#                      docker compose run --rm ingest        (fetch + build + index)
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ask-olake-db
+    environment:
+      POSTGRES_USER: olake
+      POSTGRES_PASSWORD: olake
+      POSTGRES_DB: ask_olake
+    ports:
+      - "5433:5432" # 5433 on your machine, so it won't clash with a local Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U olake -d ask_olake"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    profiles: ["app"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://olake:olake@db:5432/ask_olake
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ingest:
+    build: .
+    profiles: ["ingest"]
+    command: ["olake-ingest", "run"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://olake:olake@db:5432/ask_olake
+    volumes:
+      - ingest-work:/app/apps/ingest/.work # cloned repos and crawled pages, reused between runs
+      - ingest-out:/app/apps/ingest/out
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  ingest-work:
+  ingest-out:

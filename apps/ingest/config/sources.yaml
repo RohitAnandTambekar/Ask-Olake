@@ -1,0 +1,101 @@
+# What the pipeline indexes. Two kinds of source:
+#
+#   kind: git   a GitHub repo checked out at `ref`. include/exclude are file globs
+#               relative to the repo root.
+#   kind: site  a website read through its sitemap. include/exclude are URL-path globs.
+#               Used for the docs and blog: the rendered pages already contain shared
+#               snippets, tab contents, React components and the real heading anchors.
+#
+# ref:  a branch, a tag, a full 40-character commit SHA, or `latest-release`
+#       (the highest vX.Y.Z tag, ignoring pre-releases like -rc1).
+# Globs: `**` matches anything including `/`; `*` matches within one folder or path segment.
+#       Every include pattern must match at least one file or page, or `fetch` fails:
+#       that catches typos and upstream renames.
+# product / source_type: `auto` means the parser decides per page (next step).
+# trust_tier: 1 = official docs and code, 2 = secondary official material,
+#             3 = blog and community, 4 = external sites.
+
+sources:
+  - name: docs
+    kind: site
+    site: https://olake.io
+    product: auto          # /docs/fusion/** -> fusion, everything else -> olake-go
+    source_type: auto      # /docs/release/** -> release-note, everything else -> doc
+    trust_tier: 1
+    include: ["/docs/**"]
+    exclude:
+      - "/docs/archive/**" # superseded pages, still published
+
+  - name: guides
+    kind: site
+    site: https://olake.io
+    product: olake-go
+    source_type: blog
+    trust_tier: 3
+    include: ["/blog/*/", "/learn/*/"]   # posts only, not the /blog/ listing page
+
+  - name: olake-code
+    kind: git
+    repo: datazip-inc/olake
+    ref: latest-release    # code users actually run, not unreleased master
+    product: olake-go
+    source_type: code
+    trust_tier: 1
+    include:
+      - "drivers/**/*.go"
+      - "destination/**/*.go"
+      - "constants/**/*.go"
+      - "types/**/*.go"
+      - "protocol/**/*.go"
+      - "pkg/**/*.go"
+      - "utils/**/*.go"
+      - "README.md"
+      - "examples/**/*.md"
+      - "examples/**/*.yml"
+    exclude: ["**/*_test.go", "tests/**"]
+
+  - name: ui
+    kind: git
+    repo: datazip-inc/olake-ui
+    ref: master            # the docs tell users to run master's docker-compose
+    product: ui
+    source_type: code
+    trust_tier: 2
+    include:
+      - "server/**/*.go"
+      - "README.md"
+      - "server/README.md"
+      - "api-contract.md"
+      - "docker-compose-v1.yml"
+    exclude: ["**/*_test.go"]
+
+  - name: helm
+    kind: git
+    repo: datazip-inc/olake-helm
+    ref: master
+    product: helm
+    source_type: config
+    trust_tier: 1
+    include:
+      - "helm/olake/values.yaml"
+      - "helm/olake/Chart.yaml"
+      - "helm/olake/*.md"
+      - "README.md"
+      - "worker/**/*.go"     # the Temporal worker that runs syncs on Kubernetes
+    exclude: ["**/*_test.go"]
+
+  - name: fusion
+    kind: git
+    repo: datazip-inc/olake-fusion
+    ref: master
+    product: fusion
+    source_type: doc
+    trust_tier: 2            # inherited Apache Amoro docs; OLake's own Fusion docs are in `docs`
+    include:
+      - "README.md"
+      - "docs/**/*.md"
+      - "charts/amoro/Chart.yaml"
+      - "charts/amoro/values.yaml"
+      - "charts/amoro/README.md"
+      - "dist/src/main/amoro-bin/conf/config.yaml"
+    # Java sources are deliberately left out for now: large, and low answer value.

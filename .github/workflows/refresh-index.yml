@@ -1,0 +1,50 @@
+name: Refresh index
+
+# Nightly: fetch the latest docs and repos, rebuild the index, and evaluate it.
+# The new index version is only activated if the evaluation passes; otherwise the
+# previous version keeps serving and this run fails, so someone looks at it.
+#
+# Needs repository secrets: DATABASE_URL (production database), OPENAI_API_KEY,
+# and ANTHROPIC_API_KEY if answers are generated with Claude.
+
+on:
+  schedule:
+    - cron: "17 2 * * *" # 02:17 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: refresh-index
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      EMBEDDING_PROVIDER: openai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --no-dev
+      - name: Cache crawled pages and checkouts
+        uses: actions/cache@v4
+        with:
+          path: apps/ingest/.work
+          key: ingest-work-${{ github.run_id }}
+          restore-keys: ingest-work-
+      - run: uv run olake-ingest migrate
+      - run: uv run olake-ingest fetch
+      - run: uv run olake-ingest build
+      - name: Load new index version (not live yet)
+        run: uv run olake-ingest index --no-activate
+      - name: Evaluate the new version, then activate it if it passes
+        run: uv run olake-api eval --version latest-ready --activate-on-pass
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: eval/report.*

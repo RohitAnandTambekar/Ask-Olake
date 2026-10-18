@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+apps/ingest/.work/
+apps/ingest/out/
+**/node_modules/
+eval/report.json
+eval/report.md
