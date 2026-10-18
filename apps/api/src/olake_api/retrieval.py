@@ -8,7 +8,13 @@ Four retrievers, fused with Reciprocal Rank Fusion (RRF):
 
 RRF adds 1/(60 + rank) from each list a chunk appears in, so a chunk ranked well by
 several retrievers wins without having to calibrate their raw scores against each
-other. Final scores are then nudged by trust tier and by connector/product hints.
+other. Fused scores are then nudged by trust tier and by connector/product hints.
+
+RRF alone buries a chunk that only the vector retriever finds, even when it is the
+closest match in meaning (common words lift weaker chunks past it). So the top
+RERANK_POOL fused results are re-ranked by a blend: FUSED_SHARE of the fused score and
+the rest vector similarity, both scaled to 0-1 within the pool. When the question names
+exactly one connector, chunks about a different connector are dropped first.
 """
 
 import re
@@ -24,6 +30,9 @@ WEIGHTS = {"vector": 1.0, "words": 1.0, "idents": 1.5, "symbols": 1.5, "errors":
 TRUST = {1: 1.0, 2: 0.92, 3: 0.7, 4: 0.6}
 CONNECTOR_BOOST = 1.2
 FUSION_BOOST = 1.15
+RERANK_POOL = 40
+FUSED_SHARE = 0.3  # tuned on eval/golden.yaml plus the team test cases
+SIM_TRUST = {1: 1.0, 2: 0.97, 3: 0.9, 4: 0.85}  # gentler than TRUST: similarity already ranks
 SAFE_WORD = re.compile(r"^[a-z0-9]+$")
 MIN_ERROR_PREFIX = 12
 
@@ -71,6 +80,33 @@ class RetrievalResult:
         if self.symbol_match or self.ident_match:
             return True
         return self.best_similarity >= similarity_floor and self.coverage >= min_coverage
+
+
+def same_connector(hits: list[Hit], connectors: list[str]) -> list[Hit]:
+    """Drop chunks about another connector when the question names exactly one."""
+    if len(connectors) != 1:
+        return hits
+    kept = [h for h in hits if h.connector in (None, connectors[0])]
+    return kept or hits
+
+
+def rerank(hits: list[Hit]) -> list[Hit]:
+    """Blend fused score and vector similarity (each scaled to 0-1 within the pool).
+
+    An exact symbol or error-string match counts as full similarity: a pasted error
+    reads nothing like the Go code that raises it, but that code is the answer.
+    """
+    if not hits:
+        return hits
+    top = max(h.score for h in hits) or 1.0
+    sims = [h.similarity or 0.0 for h in hits]
+    lo, hi = min(sims), max(sims)
+    for h in hits:
+        exact = "errors" in h.matched_by or "symbols" in h.matched_by
+        sim = 1.0 if exact or hi <= lo else ((h.similarity or 0.0) - lo) / (hi - lo)
+        sim *= SIM_TRUST.get(h.trust_tier, 0.85)
+        h.score = FUSED_SHARE * (h.score / top) + (1 - FUSED_SHARE) * sim
+    return sorted(hits, key=lambda h: h.score, reverse=True)
 
 
 def index_model(conn, version: int) -> str:
@@ -216,7 +252,7 @@ def search(
     if not scores:
         return RetrievalResult([], version, 0.0, False, False, 0.0)
 
-    pool = sorted(scores, key=scores.get, reverse=True)[: top_k * 3]
+    pool = sorted(scores, key=scores.get, reverse=True)[: max(RERANK_POOL, top_k)]
     rows = conn.execute(
         """
         select id, text, display_text, url, meta, product, source_type, trust_tier, connector,
@@ -251,8 +287,7 @@ def search(
                 matched_by=matched.get(r[0], []),
             )
         )
-    hits.sort(key=lambda h: h.score, reverse=True)
-    hits = hits[:top_k]
+    hits = rerank(same_connector(hits, query.connectors))[:top_k]
     keywords = query.keywords
     coverage = 1.0
     if keywords:

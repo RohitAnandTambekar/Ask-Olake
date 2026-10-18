@@ -3,7 +3,9 @@
 POST /api/chat       Server-Sent Events stream (see answer.py for the event types); the widget
 POST /ask            one JSON response, for scripts and integrations: {question} -> {answer, sources}
 POST /api/feedback   thumbs up/down on an answer
-GET  /api/model      which model generates answers: {provider, model, embedding_model}
+GET  /api/model      which model generates answers: {provider, model, fallbacks, embedding_model}
+GET  /models         model ids the OpenRouter key may use, as OpenRouter lists them
+GET  /version        {commit, deployment} of this deploy, from Vercel's environment variables
 GET  /api/health     readiness: database, active index, model match, LLM mode
 GET  /               demo page with the widget
 GET  /widget.js      the embeddable widget
@@ -11,6 +13,7 @@ GET  /widget.js      the embeddable widget
 
 import json
 import logging
+import os
 import threading
 import uuid
 from collections.abc import Iterator
@@ -18,6 +21,7 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Literal
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -198,6 +202,7 @@ def feedback(body: FeedbackRequest, request: Request) -> Response:
 class ModelInfo(BaseModel):
     provider: str  # openrouter | anthropic | openai | extractive
     model: str | None  # None in extractive mode: answers are passages, not generated text
+    fallbacks: list[str]  # tried in order when the primary model fails (OpenRouter only)
     embedding_model: str
 
 
@@ -209,7 +214,49 @@ def model_info() -> ModelInfo:
     return ModelInfo(
         provider=llm.name.split(":", 1)[0] if llm else "extractive",
         model=llm.model if llm else None,
+        fallbacks=getattr(llm, "fallbacks", []),
         embedding_model=answerer.embedder.model,
+    )
+
+
+class ModelsResponse(BaseModel):
+    models: list[str]
+
+
+@app.get("/models", response_model=ModelsResponse)
+def models(request: Request) -> ModelsResponse:
+    """The model ids OpenRouter lists for this key, already filtered by its restrictions."""
+    if not limiter.allow(f"models:{_client_ip(request)}"):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+    if not settings.openrouter_api_key:
+        raise HTTPException(status_code=503, detail="OPENROUTER_API_KEY is not set.")
+    try:
+        r = httpx.get(
+            f"{settings.openrouter_base_url}/models/user",
+            headers={"authorization": f"Bearer {settings.openrouter_api_key}"},
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        ids = [m["id"] for m in r.json()["data"]]
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        log.warning("OpenRouter model list failed: %s", exc)
+        raise HTTPException(
+            status_code=502, detail="Could not get the model list from OpenRouter."
+        ) from exc
+    return ModelsResponse(models=ids)
+
+
+class VersionInfo(BaseModel):
+    commit: str | None
+    deployment: str | None
+
+
+@app.get("/version", response_model=VersionInfo)
+def version() -> VersionInfo:
+    """Read on every call, so it always describes the deploy that is serving."""
+    return VersionInfo(
+        commit=os.environ.get("VERCEL_GIT_COMMIT_SHA"),
+        deployment=os.environ.get("VERCEL_DEPLOYMENT_ID"),
     )
 
 

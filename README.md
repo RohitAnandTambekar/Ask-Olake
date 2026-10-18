@@ -280,7 +280,7 @@ Providers, chosen by `LLM_PROVIDER`:
 
 | Provider | Used when | Notes |
 | --- | --- | --- |
-| `openrouter` | default for this deployment; first choice under `auto` | OpenAI-compatible API at `https://openrouter.ai/api/v1`, `X-Title: Ask OLake` |
+| `openrouter` | default for this deployment; first choice under `auto` | OpenAI-compatible API at `https://openrouter.ai/api/v1`; `z-ai/glm-4.7-flash`, falling back to `google/gemini-2.5-flash-lite` then `deepseek/deepseek-v4.1-flash` |
 | `anthropic` | `ANTHROPIC_API_KEY` set | Claude via the official SDK, temperature 0 |
 | `openai` | `OPENAI_API_KEY` set and no other key | OpenAI chat completions |
 | `extractive` | no key, or the provider fails before any text streamed | no model: shows the 3 most relevant passages |
@@ -321,6 +321,8 @@ Postman).
 | `POST` | `/ask` | One question → one JSON answer. For scripts and integrations. |
 | `POST` | `/api/chat` | Streamed answer (Server-Sent Events) with history. Used by the widget. |
 | `GET` | `/api/model` | Which model generates answers. |
+| `GET` | `/models` | Model ids OpenRouter allows for the configured key (from `GET /api/v1/models/user`). |
+| `GET` | `/version` | `{commit, deployment}` from `VERCEL_GIT_COMMIT_SHA` / `VERCEL_DEPLOYMENT_ID`, read on each call. |
 | `POST` | `/api/feedback` | Thumbs up/down on an answer. |
 | `GET` | `/api/health` | Readiness: database, active index, model match. |
 | `GET` | `/`, `/widget.js` | Demo page and the embeddable widget. |
@@ -370,10 +372,28 @@ The response is `text/event-stream`:
 ### `GET /api/model`
 
 ```json
-{"provider": "openrouter", "model": "google/gemini-2.5-flash-lite", "embedding_model": "text-embedding-3-small"}
+{"provider": "openrouter", "model": "z-ai/glm-4.7-flash",
+ "fallbacks": ["google/gemini-2.5-flash-lite", "deepseek/deepseek-v4.1-flash"],
+ "embedding_model": "text-embedding-3-small"}
 ```
 
-`model` is `null` in extractive mode.
+`model` is `null` and `fallbacks` empty in extractive mode.
+
+### `GET /models`
+
+```json
+{"models": ["z-ai/glm-4.7-flash", "google/gemini-2.5-flash-lite", "deepseek/deepseek-v4.1-flash"]}
+```
+
+Asks OpenRouter which models the key may use, so the list follows the key's guardrail. `503` without a key, `502` when OpenRouter fails.
+
+### `GET /version`
+
+```json
+{"commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "deployment": "dpl_7Gw5ZMBpQA8h9GF832KGp7nwbuh3"}
+```
+
+Both values are read from the environment on every call (`VERCEL_GIT_COMMIT_SHA`, `VERCEL_DEPLOYMENT_ID`), so they are `null` where those variables aren't set.
 
 ### `POST /api/feedback`
 
@@ -426,7 +446,8 @@ All settings are environment variables, read from the process environment or the
 | `OPENAI_API_KEY` | – | Embeddings (ingestion and every question) |
 | `LLM_PROVIDER` | `auto` | `openrouter`, `anthropic`, `openai`, `extractive`, or `auto` (OpenRouter → Anthropic → OpenAI → extractive, by available key) |
 | `OPENROUTER_API_KEY` | – | Answer generation via OpenRouter |
-| `OPENROUTER_MODEL` | `google/gemini-2.5-flash-lite` | Must be allowed by the key's guardrail; `z-ai/glm-4.7-flash` and `deepseek/deepseek-v4.1-flash` also are |
+| `OPENROUTER_MODEL` | `z-ai/glm-4.7-flash` | Primary answer model; must be allowed by the key's guardrail (others get a 403) |
+| `OPENROUTER_FALLBACK_MODELS` | `google/gemini-2.5-flash-lite,deepseek/deepseek-v4.1-flash` | Tried in order when the primary fails, sent in OpenRouter's `models` field |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | |
 | `OPENROUTER_SITE_URL` | – | Optional; sent as `HTTP-Referer` for OpenRouter attribution |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | – / `claude-sonnet-5-5` | Alternative provider |

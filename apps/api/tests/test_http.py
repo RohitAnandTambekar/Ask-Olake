@@ -27,8 +27,61 @@ def test_model_reports_extractive_mode(api):
     assert body == {
         "provider": "extractive",
         "model": None,
+        "fallbacks": [],
         "embedding_model": api.get_answerer().embedder.model,
     }
+
+
+def test_version_reads_vercel_variables_on_each_call(api, monkeypatch):
+    monkeypatch.delenv("VERCEL_GIT_COMMIT_SHA", raising=False)
+    monkeypatch.delenv("VERCEL_DEPLOYMENT_ID", raising=False)
+    with TestClient(api.app) as client:
+        assert client.get("/version").json() == {"commit": None, "deployment": None}
+        monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678")
+        monkeypatch.setenv("VERCEL_DEPLOYMENT_ID", "dpl_7Gw5ZMBpQA8h9GF832KGp7nwbuh3")
+        assert client.get("/version").json() == {
+            "commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+            "deployment": "dpl_7Gw5ZMBpQA8h9GF832KGp7nwbuh3",
+        }
+
+
+class _FakeResponse:
+    def __init__(self, status: int, body: dict):
+        self.status_code, self._body = status, body
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            import httpx
+
+            raise httpx.HTTPStatusError("error", request=None, response=None)
+
+    def json(self):
+        return self._body
+
+
+def test_models_returns_ids_openrouter_lists_for_the_key(api, monkeypatch):
+    calls = []
+
+    def fake_get(url, headers, timeout):
+        calls.append((url, headers))
+        return _FakeResponse(200, {"data": [{"id": "z-ai/glm-4.7-flash"}, {"id": "x/y"}]})
+
+    monkeypatch.setattr(api.settings, "openrouter_api_key", "sk-or-test")
+    monkeypatch.setattr(api.httpx, "get", fake_get)
+    with TestClient(api.app) as client:
+        r = client.get("/models")
+    assert r.json() == {"models": ["z-ai/glm-4.7-flash", "x/y"]}
+    assert calls[0][0] == "https://openrouter.ai/api/v1/models/user"
+    assert calls[0][1]["authorization"] == "Bearer sk-or-test"
+
+
+def test_models_reports_missing_key_and_upstream_errors(api, monkeypatch):
+    monkeypatch.setattr(api.settings, "openrouter_api_key", None)
+    with TestClient(api.app) as client:
+        assert client.get("/models").status_code == 503
+        monkeypatch.setattr(api.settings, "openrouter_api_key", "sk-or-test")
+        monkeypatch.setattr(api.httpx, "get", lambda *a, **k: _FakeResponse(401, {}))
+        assert client.get("/models").status_code == 502
 
 
 def test_model_reports_the_answering_llm(api):

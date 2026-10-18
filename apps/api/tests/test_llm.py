@@ -69,3 +69,30 @@ def test_openrouter_streams_with_max_tokens():
     assert calls[0]["max_tokens"] == llm.max_tokens
     assert "max_completion_tokens" not in calls[0]
     assert calls[0]["messages"][0]["role"] == "system"
+
+
+def test_openrouter_sends_models_in_priority_order_as_fallbacks():
+    llm = OpenRouterLLM(_settings(openrouter_api_key="sk-or-test"))
+    assert llm.model == "z-ai/glm-4.7-flash"
+    assert llm.fallbacks == ["google/gemini-2.5-flash-lite", "deepseek/deepseek-v4.1-flash"]
+    assert llm._extra == {
+        "extra_body": {
+            "models": [
+                "z-ai/glm-4.7-flash",
+                "google/gemini-2.5-flash-lite",
+                "deepseek/deepseek-v4.1-flash",
+            ]
+        }
+    }
+
+
+def test_fallback_list_drops_duplicates_and_blanks():
+    s = _settings(
+        openrouter_model="google/gemini-2.5-flash-lite",
+        openrouter_fallback_models=" google/gemini-2.5-flash-lite, ,z-ai/glm-4.7-flash",
+    )
+    assert s.openrouter_models == ["google/gemini-2.5-flash-lite", "z-ai/glm-4.7-flash"]
+
+
+def test_openai_requests_carry_no_openrouter_fields():
+    assert OpenAILLM(_settings(openai_api_key="sk-openai"))._extra == {}

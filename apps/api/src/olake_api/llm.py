@@ -63,10 +63,15 @@ class OpenAILLM:
         """(api key, model, extra client options) for this provider."""
         return settings.openai_api_key, settings.openai_chat_model, {}
 
+    def _request_extra(self, settings: Settings) -> dict:
+        """Extra fields for every chat request; none for OpenAI itself."""
+        return {}
+
     def __init__(self, settings: Settings):
         import openai
 
         api_key, model, options = self._options(settings)
+        self._extra = self._request_extra(settings)
         if not api_key:
             raise LLMError(f"{self.provider.upper()}_API_KEY is not set")
         self._client = openai.OpenAI(
@@ -87,6 +92,7 @@ class OpenAILLM:
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
                 stream=True,
                 **{self.max_tokens_param: self.max_tokens},
+                **self._extra,
             )
             for event in response:
                 if event.choices and event.choices[0].delta and event.choices[0].delta.content:
@@ -111,6 +117,11 @@ class OpenRouterLLM(OpenAILLM):
             settings.openrouter_model,
             {"base_url": settings.openrouter_base_url, "default_headers": headers},
         )
+
+    def _request_extra(self, settings: Settings) -> dict:
+        # OpenRouter tries these in order when one is down, rate-limited or refuses
+        self.fallbacks = settings.openrouter_models[1:]
+        return {"extra_body": {"models": settings.openrouter_models}}
 
 
 def make_llm(settings: Settings) -> LLM | None:

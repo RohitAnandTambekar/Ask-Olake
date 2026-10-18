@@ -28,7 +28,10 @@ class Settings(BaseSettings):
     # relevant passages with links). Embeddings always use OpenAI (see embedding_provider).
     llm_provider: Literal["auto", "openrouter", "anthropic", "openai", "extractive"] = "auto"
     openrouter_api_key: str | None = None
-    openrouter_model: str = "google/gemini-2.5-flash-lite"  # must be allowed by the key's guardrail
+    # Tried in order: the primary, then each fallback (OpenRouter's `models` field).
+    # All must be allowed by the key's guardrail; any other model gets a 403.
+    openrouter_model: str = "z-ai/glm-4.7-flash"
+    openrouter_fallback_models: str = "google/gemini-2.5-flash-lite,deepseek/deepseek-v4.1-flash"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_site_url: str | None = None  # sent as HTTP-Referer for OpenRouter attribution
     anthropic_api_key: str | None = None
@@ -59,6 +62,12 @@ class Settings(BaseSettings):
         if self.min_similarity is not None:
             return self.min_similarity
         return 0.12 if self.embedding_provider == "hashing" else 0.30
+
+    @property
+    def openrouter_models(self) -> list[str]:
+        """Primary model first, then the fallbacks, without duplicates."""
+        fallbacks = [m.strip() for m in self.openrouter_fallback_models.split(",") if m.strip()]
+        return list(dict.fromkeys([self.openrouter_model, *fallbacks]))
 
     @property
     def resolved_llm(self) -> str:
