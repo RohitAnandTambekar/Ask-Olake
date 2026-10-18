@@ -38,8 +38,8 @@ log = logging.getLogger("olake_api.answer")
 
 SLACK_URL = "https://olake.io/slack/"
 ISSUES_URL = "https://github.com/datazip-inc/olake/issues"
-DETECT_CHARS = len(NOT_FOUND) + 2
-RELATED_COVERAGE = 0.34  # share of question keywords the suggested pages must contain  # buffer this much before streaming, to catch NOT_FOUND
+DETECT_CHARS = len(NOT_FOUND) + 2  # buffer this much before streaming, to catch NOT_FOUND
+RELATED_COVERAGE = 0.34  # share of question keywords the suggested pages must contain
 
 
 @dataclass
@@ -61,8 +61,6 @@ class Answerer:
             raise IndexUnavailable(
                 f"active index was built with {model!r} but the API embeds with {self.embedder.model!r}"
             )
-
-    # ---------- helpers ----------
 
     @staticmethod
     def _source_payload(hits: list[Hit]) -> list[dict]:
@@ -108,8 +106,6 @@ class Answerer:
                     excerpt += "\n```"
             parts.append(f"\n**{h.title}** [{n}]\n\n{excerpt}")
         return "\n".join(parts)
-
-    # ---------- main flow ----------
 
     def run(self, question: str, history: list[dict], client: str | None = None) -> Iterator[dict]:
         started = time.monotonic()

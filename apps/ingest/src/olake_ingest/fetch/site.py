@@ -70,7 +70,7 @@ def _get(client: httpx.Client, url: str) -> httpx.Response:
                 return response
             last_error = f"HTTP {response.status_code}"
         if attempt < RETRIES - 1:
-            time.sleep(2**attempt)  # 1s, then 2s
+            time.sleep(2**attempt)
     raise CrawlError(f"{url}: {last_error} after {RETRIES} attempts")
 
 

@@ -36,7 +36,7 @@ class ChunkMeta(BaseModel):
     title: str
     breadcrumb: list[str] = Field(default_factory=list)
     url: str  # public citation URL: olake.io page#anchor or GitHub blob permalink
-    repo: str  # e.g. "datazip-inc/olake-docs"
+    repo: str  # "owner/name" for git sources, the host (olake.io) for site pages
     path: str  # file path inside the repo
     sha: str  # commit the file was read at
     line_start: int | None = None

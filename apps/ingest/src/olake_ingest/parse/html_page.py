@@ -104,9 +104,6 @@ def _is_block(node: Tag) -> bool:
     return node.name in BLOCK_TAGS
 
 
-# ---------- inline ----------
-
-
 def _inline(node) -> str:
     if isinstance(node, NavigableString):
         return _clean(str(node))
@@ -134,9 +131,6 @@ def _inline(node) -> str:
 def _paragraph(text: str) -> str:
     lines = [line.strip() for line in text.split("\n")]
     return "\n".join(line for line in lines if line).strip()
-
-
-# ---------- blocks ----------
 
 
 def _code_block(tag: Tag) -> str:
@@ -285,9 +279,6 @@ def _render_children(tag: Tag) -> str:
             inline.append(_inline(child))
     flush()
     return "\n\n".join(parts)
-
-
-# ---------- walking the page ----------
 
 
 def _tab_panels(container: Tag) -> list[tuple[str, Tag]]:

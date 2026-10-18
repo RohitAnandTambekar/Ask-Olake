@@ -189,7 +189,6 @@ def main(
         ok = value <= limit if name == "gate_false_refusals" else value >= limit
         checks.append({"metric": name, "value": value, "threshold": limit, "ok": ok})
 
-    # ----- report -----
     out_dir = REPO_ROOT / "eval"
     report = {
         "run_at": datetime.now(UTC).isoformat(timespec="seconds"),
